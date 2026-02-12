@@ -14,7 +14,10 @@ module.exports = {
       return WIKI.models.navigation.getTree({ cache: false, locale: 'all', bypassAuth: true })
     },
     config (obj, args, context, info) {
-      return WIKI.config.nav
+      return {
+        mode: WIKI.config.nav.mode,
+        collapsible: WIKI.config.nav.collapsible === true
+      }
     }
   },
   NavigationMutation: {
@@ -36,8 +39,14 @@ module.exports = {
     },
     async updateConfig (obj, args, context) {
       try {
+        const prevNav = WIKI.config.nav || {}
+
         WIKI.config.nav = {
-          mode: args.mode
+          ...prevNav,
+          mode: args.mode,
+          collapsible: typeof args.collapsible === 'boolean'
+            ? args.collapsible
+            : (prevNav.collapsible === true)
         }
         await WIKI.configSvc.saveToDb(['nav'])
 

@@ -26,6 +26,7 @@ block body
       :page-id=page.id
       sidebar=Buffer.from(JSON.stringify(sidebar)).toString('base64')
       nav-mode=config.nav.mode
+      :nav-collapsible=(config.nav.collapsible ? 'true' : 'false')
       comments-enabled=config.features.featurePageComments
       effective-permissions=Buffer.from(JSON.stringify(effectivePermissions)).toString('base64')
       comments-external=comments.codeTemplate

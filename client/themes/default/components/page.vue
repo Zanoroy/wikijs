@@ -13,6 +13,14 @@
       :right='$vuetify.rtl'
       )
       vue-scroll(:ops='scrollStyle')
+        div.d-flex.justify-end.px-2.pt-2(v-if='navCollapsible && $vuetify.breakpoint.mdAndUp')
+          v-btn(
+            icon
+            small
+            @click='setDrawerShownDesktop(false)'
+            aria-label='Hide navigation'
+            )
+            v-icon {{ $vuetify.rtl ? `mdi-chevron-right` : `mdi-chevron-left` }}
         nav-sidebar(:color='$vuetify.theme.dark ? `grey darken-4-d4` : `primary`', :items='sidebarDecoded', :nav-mode='navMode')
 
     v-fab-transition(v-if='navMode !== `NONE`')
@@ -24,8 +32,8 @@
         :right='$vuetify.rtl'
         :left='!$vuetify.rtl'
         small
-        @click='navShown = !navShown'
-        v-if='$vuetify.breakpoint.mdAndDown'
+        @click='toggleDrawer'
+        v-if='$vuetify.breakpoint.mdAndDown || (navCollapsible && $vuetify.breakpoint.mdAndUp)'
         v-show='!navShown'
         )
         v-icon mdi-menu
@@ -472,6 +480,10 @@ export default {
       type: String,
       default: 'MIXED'
     },
+    navCollapsible: {
+      type: Boolean,
+      default: false
+    },
     commentsEnabled: {
       type: Boolean,
       default: false
@@ -551,11 +563,11 @@ export default {
     },
     pageUrl () { return window.location.href },
     upBtnPosition () {
-      if (this.$vuetify.breakpoint.mdAndUp) {
+      const shouldOffsetForDrawer = this.$vuetify.breakpoint.mdAndUp && this.navMode !== 'NONE' && this.navShown
+      if (shouldOffsetForDrawer) {
         return this.$vuetify.rtl ? `right: 235px;` : `left: 235px;`
-      } else {
-        return this.$vuetify.rtl ? `right: 65px;` : `left: 65px;`
       }
+      return this.$vuetify.rtl ? `right: 65px;` : `left: 65px;`
     },
     sidebarDecoded () {
       return JSON.parse(Buffer.from(this.sidebar, 'base64').toString())
@@ -652,6 +664,37 @@ export default {
     })
   },
   methods: {
+    navShownDesktopStorageKey () {
+      return 'navShownDesktop'
+    },
+    getNavShownDesktopPreference () {
+      try {
+        const raw = window.localStorage.getItem(this.navShownDesktopStorageKey())
+        if (raw === null) {
+          return null
+        }
+        return raw === 'true'
+      } catch (err) {
+        return null
+      }
+    },
+    setDrawerShownDesktop (shown) {
+      this.navShown = shown
+      if (this.$vuetify.breakpoint.mdAndUp && this.navCollapsible) {
+        try {
+          window.localStorage.setItem(this.navShownDesktopStorageKey(), shown ? 'true' : 'false')
+        } catch (err) {
+          // ignore
+        }
+      }
+    },
+    toggleDrawer () {
+      if (this.$vuetify.breakpoint.mdAndUp && this.navCollapsible) {
+        this.setDrawerShownDesktop(!this.navShown)
+      } else {
+        this.navShown = !this.navShown
+      }
+    },
     goHome () {
       if (this.locales && this.locales.length > 0) {
         window.location.assign(`/${this.locale}/home`)
@@ -701,7 +744,12 @@ export default {
       if (window.innerWidth === this.winWidth) { return }
       this.winWidth = window.innerWidth
       if (this.$vuetify.breakpoint.mdAndUp) {
-        this.navShown = true
+        if (this.navCollapsible) {
+          const pref = this.getNavShownDesktopPreference()
+          this.navShown = (pref === null) ? true : pref
+        } else {
+          this.navShown = true
+        }
       } else {
         this.navShown = false
       }

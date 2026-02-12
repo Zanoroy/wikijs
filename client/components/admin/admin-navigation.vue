@@ -59,6 +59,15 @@
                       v-list-item-avatar
                         v-icon(v-if='$vuetify.theme.dark', :color='config.mode === `none` ? `teal lighten-3` : `grey darken-2`') mdi-check-circle
                         v-icon(v-else, :color='config.mode === `none` ? `teal` : `grey lighten-3`') mdi-check-circle
+                v-divider
+                v-card-text
+                  v-switch(
+                    v-model='config.collapsible'
+                    inset
+                    :label='`Allow desktop drawer hide/show`'
+                    hint='When enabled, users can hide/show the left navigation drawer on desktop.'
+                    persistent-hint
+                  )
             v-col(cols='9', v-if='config.mode === `MIXED` || config.mode === `STATIC`')
               v-card.animated.fadeInUp.wait-p2s
                 v-row(no-gutters, align='stretch')
@@ -296,7 +305,8 @@ export default {
       groups: [],
       copyFromLocaleDialogIsShown: false,
       config: {
-        mode: 'NONE'
+        mode: 'NONE',
+        collapsible: false
       },
       allLocales: [],
       copyFromLocaleCode: 'en'
@@ -390,7 +400,7 @@ export default {
       try {
         const resp = await this.$apollo.mutate({
           mutation: gql`
-            mutation ($tree: [NavigationTreeInput]!, $mode: NavigationMode!) {
+            mutation ($tree: [NavigationTreeInput]!, $mode: NavigationMode!, $collapsible: Boolean) {
               navigation{
                 updateTree(tree: $tree) {
                   responseResult {
@@ -400,7 +410,7 @@ export default {
                     message
                   }
                 },
-                updateConfig(mode: $mode) {
+                updateConfig(mode: $mode, collapsible: $collapsible) {
                   responseResult {
                     succeeded
                     errorCode
@@ -413,7 +423,8 @@ export default {
           `,
           variables: {
             tree: this.trees,
-            mode: this.config.mode
+            mode: this.config.mode,
+            collapsible: this.config.collapsible
           }
         })
         if (_.get(resp, 'data.navigation.updateTree.responseResult.succeeded', false) && _.get(resp, 'data.navigation.updateConfig.responseResult.succeeded', false)) {
@@ -447,6 +458,7 @@ export default {
           navigation {
             config {
               mode
+              collapsible
             }
           }
         }

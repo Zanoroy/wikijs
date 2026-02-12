@@ -29,6 +29,7 @@ type NavigationMutation {
   ): DefaultResponse @auth(requires: ["manage:navigation", "manage:system"])
   updateConfig(
     mode: NavigationMode!
+    collapsible: Boolean
   ): DefaultResponse @auth(requires: ["manage:navigation", "manage:system"])
 }
 
@@ -70,6 +71,7 @@ input NavigationItemInput {
 
 type NavigationConfig {
   mode: NavigationMode!
+  collapsible: Boolean!
 }
 
 enum NavigationMode {
