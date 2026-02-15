@@ -13,30 +13,45 @@
       :right='$vuetify.rtl'
       )
       vue-scroll(:ops='scrollStyle')
-        div.d-flex.justify-end.px-2.pt-2(v-if='navCollapsible && $vuetify.breakpoint.mdAndUp')
-          v-btn(
-            icon
-            small
-            @click='setDrawerShownDesktop(false)'
-            aria-label='Hide navigation'
-            )
-            v-icon {{ $vuetify.rtl ? `mdi-chevron-right` : `mdi-chevron-left` }}
-        nav-sidebar(:color='$vuetify.theme.dark ? `grey darken-4-d4` : `primary`', :items='sidebarDecoded', :nav-mode='navMode')
+        nav-sidebar(:color='$vuetify.theme.dark ? `grey darken-4-d4` : `prism-primary`', :items='sidebarDecoded', :nav-mode='navMode')
 
-    v-fab-transition(v-if='navMode !== `NONE`')
+    .navtoc-fab(v-if='!printView')
       v-btn(
         fab
-        color='primary'
+        color='prism-primary'
         fixed
         bottom
-        :right='$vuetify.rtl'
-        :left='!$vuetify.rtl'
         small
-        @click='toggleDrawer'
-        v-if='$vuetify.breakpoint.mdAndDown || (navCollapsible && $vuetify.breakpoint.mdAndUp)'
-        v-show='!navShown'
+        :style='navTocFabPosition'
+        @click.stop='onNavTocFabClick'
+        aria-label='Navigation / TOC'
         )
         v-icon mdi-menu
+
+      component(is='v-slide-y-transition')
+        .navtoc-actions(
+          v-show='navTocDial && navMode !== `NONE`'
+          :style='navTocActionsPosition'
+          )
+          v-btn.navtoc-action.navtoc-action--nav(
+            small
+            depressed
+            color='prism-primary'
+            dark
+            @click='onToggleNavFromDial'
+            )
+            v-icon.mr-2(small) mdi-menu
+            span.text-none Hide/Show Navigation
+
+          v-btn.navtoc-action(
+            small
+            depressed
+            color='prism-primary'
+            dark
+            @click='onToggleTocFromDial'
+            )
+            v-icon.mr-2(small) mdi-format-list-bulleted
+            span.text-none Show/Hide TOC
 
     v-main(ref='content')
       template(v-if='path !== `home`')
@@ -95,6 +110,7 @@
         v-layout(row)
           v-flex.page-col-sd(
             v-if='tocPosition !== `off` && $vuetify.breakpoint.lgAndUp'
+            v-show='tocShown'
             :order-xs1='tocPosition !== `right`'
             :order-xs2='tocPosition === `right`'
             lg3
@@ -230,8 +246,10 @@
 
           v-flex.page-col-content(
             xs12
-            :lg9='tocPosition !== `off`'
-            :xl10='tocPosition !== `off`'
+            :lg9='tocPosition !== `off` && tocShown'
+            :xl10='tocPosition !== `off` && tocShown'
+            :lg12='tocPosition === `off` || !tocShown'
+            :xl12='tocPosition === `off` || !tocShown'
             :order-xs1='tocPosition === `right`'
             :order-xs2='tocPosition !== `right`'
             )
@@ -510,6 +528,8 @@ export default {
       locales: siteLangs,
       navShown: false,
       navExpanded: false,
+      navTocDial: false,
+      tocShown: true,
       upBtnShown: false,
       pageEditFab: false,
       scrollOpts: {
@@ -567,7 +587,32 @@ export default {
       if (shouldOffsetForDrawer) {
         return this.$vuetify.rtl ? `right: 235px;` : `left: 235px;`
       }
-      return this.$vuetify.rtl ? `right: 65px;` : `left: 65px;`
+      return this.$vuetify.rtl ? `right: 35px;` : `left: 35px;`
+    },
+    navTocFabPosition () {
+      const shouldOffsetForDrawer = this.$vuetify.breakpoint.mdAndUp && this.navMode !== 'NONE' && this.navShown
+      const inset = shouldOffsetForDrawer ? 235 : 35
+      return this.$vuetify.rtl ? `right: ${inset}px;` : `left: ${inset}px;`
+    },
+    navTocActionsPosition () {
+      const shouldOffsetForDrawer = this.$vuetify.breakpoint.mdAndUp && this.navMode !== 'NONE' && this.navShown
+
+      // Matches Vuetify fixed-button defaults reasonably well:
+      // - fixed bottom buttons are offset ~16px
+      // - small fab is ~40px tall
+      const fixedBottomOffset = 16
+      const fabSize = 40
+      const gap = 12
+
+      const inset = shouldOffsetForDrawer ? 235 : 35
+      const center = inset + (fabSize / 2)
+      const bottom = fixedBottomOffset + fabSize + gap
+
+      // transform: translateX(50%);
+      // transform: translateX(-50%);
+      return this.$vuetify.rtl
+        ? `right: ${center}px; bottom: ${bottom}px;`
+        : `left: ${center}px; bottom: ${bottom}px;`
     },
     sidebarDecoded () {
       return JSON.parse(Buffer.from(this.sidebar, 'base64').toString())
@@ -622,6 +667,12 @@ export default {
       this.scrollStyle.bar.background = '#424242'
     }
 
+    // -> Restore UI visibility preferences (drawer + TOC)
+    const tocPref = this.getTocShownPreference()
+    if (tocPref !== null) {
+      this.tocShown = tocPref
+    }
+
     // -> Check side navigation visibility
     this.handleSideNavVisibility()
     window.addEventListener('resize', _.debounce(() => {
@@ -663,7 +714,59 @@ export default {
       window.boot.notify('page-ready')
     })
   },
+  watch: {
+    navShown (newValue) {
+      // On desktop, persist the drawer state so it survives reloads.
+      // Only applies when the drawer is configured as collapsible.
+      if (this.$vuetify.breakpoint.mdAndUp && this.navCollapsible) {
+        try {
+          window.localStorage.setItem(this.navShownDesktopStorageKey(), newValue ? 'true' : 'false')
+        } catch (err) {
+          // ignore
+        }
+      }
+    },
+    tocShown (newValue) {
+      try {
+        window.localStorage.setItem(this.tocShownStorageKey(), newValue ? 'true' : 'false')
+      } catch (err) {
+        // ignore
+      }
+    }
+  },
   methods: {
+    onNavTocFabClick () {
+      if (this.navMode === 'NONE') {
+        this.toggleToc()
+        return
+      }
+      this.navTocDial = !this.navTocDial
+    },
+    onToggleNavFromDial () {
+      this.toggleDrawer()
+      this.navTocDial = false
+    },
+    onToggleTocFromDial () {
+      this.toggleToc()
+      this.navTocDial = false
+    },
+    toggleToc () {
+      this.tocShown = !this.tocShown
+    },
+    tocShownStorageKey () {
+      return 'tocShown'
+    },
+    getTocShownPreference () {
+      try {
+        const raw = window.localStorage.getItem(this.tocShownStorageKey())
+        if (raw === null) {
+          return null
+        }
+        return raw === 'true'
+      } catch (err) {
+        return null
+      }
+    },
     navShownDesktopStorageKey () {
       return 'navShownDesktop'
     },
@@ -765,6 +868,20 @@ export default {
 </script>
 
 <style lang="scss">
+
+.navtoc-fab {
+  z-index: 6;
+}
+
+.navtoc-actions {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+}
+
+.navtoc-action--nav {
+  margin-bottom: 8px;
+}
 
 .breadcrumbs-nav {
   .v-btn {

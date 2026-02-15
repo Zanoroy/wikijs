@@ -89,4 +89,44 @@ html {
     background-color: darken(mc('indigo', '900'), 10%) !important;
     border-color: darken(mc('indigo', '900'), 10%) !important;
   }
+
+  $prism-primary-base: #5097dc;
+
+  .prism-primary {
+    background-color: $prism-primary-base !important;
+    border-color: $prism-primary-base !important;
+  }
+
+  .prism-primary--text {
+    color: $prism-primary-base !important;
+    caret-color: $prism-primary-base !important;
+  }
+
+  @for $i from 1 through 5 {
+    $light: mix(#fff, $prism-primary-base, percentage($i / 10));
+
+    .prism-primary.lighten-#{$i} {
+      background-color: $light !important;
+      border-color: $light !important;
+    }
+
+    .prism-primary--text.text--lighten-#{$i} {
+      color: $light !important;
+      caret-color: $light !important;
+    }
+  }
+
+  @for $i from 1 through 4 {
+    $dark: mix(#000, $prism-primary-base, percentage($i / 10));
+
+    .prism-primary.darken-#{$i} {
+      background-color: $dark !important;
+      border-color: $dark !important;
+    }
+
+    .prism-primary--text.text--darken-#{$i} {
+      color: $dark !important;
+      caret-color: $dark !important;
+    }
+  }
 }
